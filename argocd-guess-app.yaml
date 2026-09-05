@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guess-number-app
+  namespace: argocd
+  # Finalizer ensures that when the Argo CD app is deleted, resources in the cluster are cleaned up
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # Source repository configuration
+  source:
+    repoURL: https://github.com/RAM55O/guess-number.git
+    targetRevision: main
+    path: guess # Subdirectory path where Chart.yaml and values.yaml are located
+    helm:
+      valueFiles:
+        - values.yaml
+      valuesObject:
+        image:
+          repository: guess_number-app
+          tag: "latest"
+          pullPolicy: IfNotPresent
+        service:
+          type: ClusterIP
+          port: 8080
+
+  # Target destination cluster and namespace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  # Sync policy configuration
+  syncPolicy:
+    automated:
+      prune: true # Automatically removes resources deleted from git
+      selfHeal: true # Reverts manual cluster edits back to the git state
+    syncOptions:
+      - CreateNamespace=true

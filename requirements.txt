@@ -1,0 +1,6 @@
+# Guess the Number - Python & SQLite
+# This project is built using 100% Python Standard Library (Zero mandatory external dependencies!)
+# Compatible with Python 3.8+ (including Python 3.10, 3.11, 3.12, 3.13, 3.14+)
+
+# Optional enhancement packages:
+# colorama>=0.4.6  # For enhanced ANSI color output on legacy Windows cmd.exe

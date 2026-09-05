@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎲 Guess the Number - Python & SQLite</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="background-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <header class="app-header">
+    <div class="logo">
+      <span class="dice-icon">🎲</span>
+      <div>
+        <h1>Guess the Number</h1>
+        <span class="subtext">Persistent SQLite Database Edition</span>
+      </div>
+    </div>
+    <div class="header-controls">
+      <div class="player-badge" id="player-badge">
+        <span class="badge-label">Player:</span>
+        <span class="badge-name" id="current-player-display">Guest</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btn-change-player">Switch Player</button>
+    </div>
+  </header>
+
+  <main class="main-layout">
+    <!-- Left: Game Play Area -->
+    <section class="game-section">
+      <!-- Player Setup / Difficulty Card -->
+      <div class="card" id="setup-card">
+        <h2>Start New Game</h2>
+        <p class="text-muted">Choose your difficulty and challenge yourself to guess the secret number!</p>
+
+        <div class="form-group">
+          <label for="player-input">Player Name</label>
+          <input type="text" id="player-input" placeholder="Enter your name (e.g. Alex)" value="Player 1" />
+        </div>
+
+        <div class="difficulty-grid">
+          <button class="diff-btn active" data-diff="Easy">
+            <span class="diff-title">🟢 Easy</span>
+            <span class="diff-desc">1 to 50 • 10 Attempts</span>
+          </button>
+          <button class="diff-btn" data-diff="Medium">
+            <span class="diff-title">🟡 Medium</span>
+            <span class="diff-desc">1 to 100 • 7 Attempts</span>
+          </button>
+          <button class="diff-btn" data-diff="Hard">
+            <span class="diff-title">🔴 Hard</span>
+            <span class="diff-desc">1 to 500 • 5 Attempts</span>
+          </button>
+          <button class="diff-btn" data-diff="Custom">
+            <span class="diff-title">🟣 Custom</span>
+            <span class="diff-desc">Set your own bounds</span>
+          </button>
+        </div>
+
+        <!-- Custom Config Fields (Hidden by default) -->
+        <div id="custom-fields" class="custom-fields-container hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="custom-min">Min Number</label>
+              <input type="number" id="custom-min" value="1" min="1" />
+            </div>
+            <div class="form-group">
+              <label for="custom-max">Max Number</label>
+              <input type="number" id="custom-max" value="250" min="2" />
+            </div>
+            <div class="form-group">
+              <label for="custom-attempts">Max Attempts</label>
+              <input type="number" id="custom-attempts" value="8" min="1" max="50" />
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" id="btn-start-game">▶️ Start Game</button>
+      </div>
+
+      <!-- Active Game Card (Hidden initially) -->
+      <div class="card hidden" id="gameplay-card">
+        <div class="game-header">
+          <div>
+            <span class="tag" id="game-diff-tag">Medium Mode</span>
+            <h2 id="game-range-label">Range: 1 to 100</h2>
+          </div>
+          <div class="attempts-indicator">
+            <div class="attempts-text">
+              Attempts: <strong id="attempts-left-count">7</strong> / <span id="max-attempts-count">7</span>
+            </div>
+            <div class="attempts-pills" id="attempts-pills"></div>
+          </div>
+        </div>
+
+        <!-- Range Visualizer -->
+        <div class="range-visualizer-box">
+          <div class="range-visual-label">
+            <span>Target Search Range:</span>
+            <span class="range-values" id="visual-range-text">[ 1 ... 100 ]</span>
+          </div>
+          <div class="range-bar-track">
+            <div class="range-bar-active" id="range-bar-active" style="left: 0%; width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Guess Input Form -->
+        <form class="guess-form" id="guess-form">
+          <input 
+            type="number" 
+            id="guess-input" 
+            placeholder="Type your guess..." 
+            autocomplete="off" 
+            required 
+            autofocus 
+          />
+          <button type="submit" class="btn btn-primary" id="btn-submit-guess">Submit Guess 🎯</button>
+        </form>
+
+        <!-- Message / Hint Banner -->
+        <div class="hint-banner" id="hint-banner">
+          Enter your first guess above to receive directional clues!
+        </div>
+
+        <!-- Guesses History Log -->
+        <div class="history-log-section">
+          <h3>Turn History</h3>
+          <div class="history-list" id="history-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div class="game-controls">
+          <button class="btn btn-secondary btn-sm" id="btn-abandon-game">Abandon Game</button>
+        </div>
+      </div>
+
+      <!-- Game Result Modal / Card -->
+      <div class="card result-card hidden" id="result-card">
+        <div class="result-icon" id="result-icon">🎉</div>
+        <h2 id="result-title">You Won!</h2>
+        <p id="result-message">You cracked the secret number in 4 attempts.</p>
+
+        <div class="score-badge-box">
+          <div class="score-item">
+            <span class="label">Target Number</span>
+            <span class="value" id="result-target">42</span>
+          </div>
+          <div class="score-item highlight">
+            <span class="label">Final Score</span>
+            <span class="value" id="result-score">340 pts</span>
+          </div>
+          <div class="score-item">
+            <span class="label">Time Taken</span>
+            <span class="value" id="result-time">12.4s</span>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <button class="btn btn-primary" id="btn-play-again">Play Again 🔁</button>
+          <button class="btn btn-secondary" id="btn-view-stats-tab">View My Stats 📊</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Leaderboards & Player Stats -->
+    <aside class="sidebar-section">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="leaderboard">🏆 Top Leaderboard</button>
+        <button class="tab-btn" data-tab="player-stats">📊 My Profile Stats</button>
+      </div>
+
+      <!-- Tab 1: Global Leaderboard -->
+      <div class="tab-content active" id="tab-leaderboard">
+        <div class="card">
+          <div class="card-header-flex">
+            <h3>Global High Scores</h3>
+            <button class="btn-icon" id="btn-refresh-leaderboard" title="Refresh Leaderboard">🔄</button>
+          </div>
+          <div class="table-responsive">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Player</th>
+                  <th>Diff</th>
+                  <th>Score</th>
+                  <th>Attempts</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-tbody">
+                <tr><td colspan="5" class="text-center text-muted">Loading leaderboard...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Player Stats -->
+      <div class="tab-content" id="tab-player-stats">
+        <div class="card">
+          <div class="card-header-flex">
+            <h3 id="stats-player-name">Player Stats</h3>
+          </div>
+          <div class="stats-grid" id="stats-grid">
+            <div class="stat-box">
+              <span class="stat-num" id="stat-games">0</span>
+              <span class="stat-label">Games Played</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num text-success" id="stat-wins">0</span>
+              <span class="stat-label">Games Won</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num text-accent" id="stat-winrate">0%</span>
+              <span class="stat-label">Win Rate</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num text-warning" id="stat-highscore">0</span>
+              <span class="stat-label">High Score</span>
+            </div>
+          </div>
+
+          <h4 class="mt-4">Recent Games</h4>
+          <div class="recent-games-list" id="recent-games-list">
+            <p class="text-muted text-center">No games recorded yet.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="app-footer">
+    <p>Guess the Number • SQLite Relational Database Engine • Python HTTP Backend</p>
+  </footer>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

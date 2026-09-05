@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    container_name: guess-the-number
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - MODE=web
+      - DB_PATH=/app/data/game.db
+    volumes:
+      - game-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  game-data:
