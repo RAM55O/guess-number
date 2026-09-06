@@ -19,7 +19,7 @@ spec:
         - values.yaml
       valuesObject:
         image:
-          repository: guess_number-app
+          repository: ram55o/guess-number
           tag: "latest"
           pullPolicy: IfNotPresent
         service:
