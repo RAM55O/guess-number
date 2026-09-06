@@ -1,0 +1,90 @@
+﻿name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-and-scan:
+    name: Test, SonarQube & Trivy Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies & Run Tests
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pytest tests/
+
+      - name: SonarQube Code Analysis
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Trivy Repo Scan (FS & Secrets)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+  build-and-push:
+    name: Build, Docker Scan & Push
+    needs: test-and-scan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker-setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker Image locally
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/guess-number:${{ github.sha }} .
+
+      - name: Trivy Image Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/guess-number:${{ github.sha }}
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/guess-number:${{ github.sha }}
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/guess-number:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/guess-number:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/guess-number:latest
+
+      - name: Update Helm values.yaml with new Image Tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          sed -i 's/tag: .*/tag: "${{ github.sha }}"/' guess/values.yaml
+          git add guess/values.yaml
+          git commit -m "chore(ci): update image tag to ${{ github.sha }} [skip ci]" || exit 0
+          git push
