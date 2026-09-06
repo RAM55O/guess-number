@@ -32,7 +32,10 @@ jobs:
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || secrets.SONAR_HOST_UR }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || secrets.SONAR_HOST_UR || 'https://sonarcloud.io' }}
+        with:
+          args: >
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION || 'ram55o' }}
 
       - name: Trivy Repo Scan (FS & Secrets)
         uses: aquasecurity/trivy-action@master
